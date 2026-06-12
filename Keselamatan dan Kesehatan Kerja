@@ -1,0 +1,429 @@
+import { useState, useEffect, useMemo } from "react";
+
+const STORAGE_KEY = "poltekkes-k3-inventory-v2";
+
+const KONDISI = {
+  "Berfungsi Baik":     { bg:"#D1FAE5", tx:"#065F46", dot:"#10B981" },
+  "Baik":               { bg:"#DBEAFE", tx:"#1E40AF", dot:"#3B82F6" },
+  "Diajukan Kalibrasi": { bg:"#EDE9FE", tx:"#5B21B6", dot:"#8B5CF6" },
+  "Rusak Ringan":       { bg:"#FEF3C7", tx:"#92400E", dot:"#F59E0B" },
+  "Rusak Berat":        { bg:"#FEE2E2", tx:"#991B1B", dot:"#EF4444" },
+  "Tidak Tersedia":     { bg:"#F3F4F6", tx:"#6B7280", dot:"#9CA3AF" },
+};
+
+const LABS = [
+  { id:"Higiene Industri", icon:"🔬" },
+  { id:"Kesehatan Kerja", icon:"🩺" },
+  { id:"Keselamatan Kerja", icon:"🦺" },
+  { id:"Fire", icon:"🔥" },
+  { id:"Rekayasa Pengendalian Risiko", icon:"⚙️" },
+];
+
+const BASE = [
+  // ── Lab Higiene Industri ─────────────────────────────────────
+  { id:"HI-01", lab:"Higiene Industri", nama:"Sound Level Meter", spesifikasi:"SL-4001, mengukur intensitas kebisingan dengan layar digital.", kegunaan:"Pengukuran kebisingan di tempat kerja", mataKuliah:"Pengantar Higiene Industri (Kurikulum 2020)", rasio:"1:5", jumlah:"4", tahun:"2023", kondisi:"Berfungsi Baik", catatan:"Diajukan kalibrasi", kompetensi:"Pengukuran bahaya fisika – kebisingan" },
+  { id:"HI-02", lab:"Higiene Industri", nama:"Lux Meter", spesifikasi:"3 range pengukuran: 2.000 / 20.000 / 100.000 LUX.", kegunaan:"Pengukuran pencahayaan di tempat kerja", mataKuliah:"Hygiene Industry 1 (Kurikulum 2020)", rasio:"1:5", jumlah:"4", tahun:"2023/2024/2025", kondisi:"Berfungsi Baik", catatan:"1 unit hibah dosen (2023), 2 unit diajukan kalibrasi (pengadaan 2024)", kompetensi:"Pengukuran bahaya fisika – pencahayaan" },
+  { id:"HI-03", lab:"Higiene Industri", nama:"Vibration Meter", spesifikasi:"Akselerasi 200 m/s², kecepatan 200 mm/s, perpindahan 2 mm. Rentang frekuensi 10 Hz – 1 kHz.", kegunaan:"Pengukuran getaran di tempat kerja", mataKuliah:"Hygiene Industry 2 (Kurikulum 2020)", rasio:"1:5", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"Sebelumnya rusak berat. Sudah diperbaiki PT Risky Putra Kasih, 6 Jan 2026. Diajukan kalibrasi.", kompetensi:"Pengukuran bahaya fisika – getaran" },
+  { id:"HI-04", lab:"Higiene Industri", nama:"Multigas Detector 4 Parameter", spesifikasi:"Mengukur H₂S, O₂, CO, dan Combustible (LEL).", kegunaan:"Pengukuran gas di udara (Cox, Nox, SOx, Partikulat)", mataKuliah:"Hygiene Industry 3 (Kurikulum 2020)", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran bahaya kimia – gas" },
+  { id:"HI-05", lab:"Higiene Industri", nama:"LVAS (Low Volume Air Sampler)", spesifikasi:"Flow meter 3–15 Lpm. Motor Vacuum Pump Multipro, maks 23 L/min. Filter holder 47 mm. Ukuran 35×21×23 cm, 220 V.", kegunaan:"Pengujian kualitas udara parameter PM 2,5", mataKuliah:"Praktikum Higiene Industri (Kurikulum 2024)", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran bahaya kimia – debu" },
+  { id:"HI-06", lab:"Higiene Industri", nama:"BOD Meter", spesifikasi:"Waterproof, mengukur DO, BOD, tekanan biometrik, dan suhu.", kegunaan:"Mengukur kadar oksigen terlarut dalam air (parameter pencemaran)", mataKuliah:"Higiene Industri", rasio:"1:10", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Pengukuran kualitas air" },
+  { id:"HI-07", lab:"Higiene Industri", nama:"COD Meter", spesifikasi:"Waterproof, mengukur COD, tekanan biometrik, dan suhu.", kegunaan:"Mengukur tingkat pencemaran air oleh zat pereduksi", mataKuliah:"Higiene Industri", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran kualitas air" },
+  { id:"HI-08", lab:"Higiene Industri", nama:"pH Meter", spesifikasi:"LCD multi-level, resolusi 0,1 pH, akurasi ±0,1 pH. Kompensasi suhu otomatis.", kegunaan:"Mengukur kadar pH dalam air (parameter pencemaran)", mataKuliah:"Higiene Industri", rasio:"1:5", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Pengukuran kualitas air" },
+  { id:"HI-09", lab:"Higiene Industri", nama:"Thermometer Ruangan", spesifikasi:"Layar LCD, rentang –10°C s/d 50°C, kelembaban 10–99% RH.", kegunaan:"Pengukuran suhu ruangan (parameter K3 lingkungan kerja)", mataKuliah:"Higiene Industri", rasio:"1:5", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran lingkungan kerja" },
+  { id:"HI-10", lab:"Higiene Industri", nama:"Hygrometer Ruangan", spesifikasi:"Layar LCD, rentang –10°C s/d 50°C, kelembaban 10–99% RH.", kegunaan:"Pengukuran kelembapan ruangan (parameter K3 lingkungan kerja)", mataKuliah:"Higiene Industri", rasio:"1:5", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran lingkungan kerja" },
+  { id:"HI-11", lab:"Higiene Industri", nama:"WBGT Meter (QT-34 3M)", spesifikasi:"Datalogging Area Heat Stress Monitor, mengukur Wet Bulb Globe Temperature (ISBB).", kegunaan:"Pengukuran indeks suhu bola basah (ISBB)", mataKuliah:"Higiene Industri", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran bahaya fisika – panas" },
+  { id:"HI-12", lab:"Higiene Industri", nama:"Portable Radiation Detector", spesifikasi:"Range 0,05–9,99 μSv/h. Energi 0,1–1,25 MeV. Dimensi 105×60×26 mm, 90 gr.", kegunaan:"Mendeteksi Radiasi Beta, Gamma, dan X-ray", mataKuliah:"Higiene Industri", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran bahaya fisika – radiasi" },
+  { id:"HI-13", lab:"Higiene Industri", nama:"Portable Anemometer", spesifikasi:"Probe teleskopik 185–1000 mm. Kecepatan 0,1–25,0 m/s. Suhu 0–50°C. USB interface.", kegunaan:"Mengukur kecepatan dan tekanan angin", mataKuliah:"Higiene Industri", rasio:"1:10", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"Sebelumnya rusak ringan (LCD pecah). Diperbaiki PT Rizki Putra Kasih, 2 Feb 2026.", kompetensi:"Pengukuran lingkungan kerja – angin" },
+
+  // ── Lab Kesehatan Kerja ───────────────────────────────────────
+  { id:"KK-01", lab:"Kesehatan Kerja", nama:"Phantom BHD (CPR Manikin)", spesifikasi:"Manekin khusus CPR.", kegunaan:"Mendemonstrasikan pertolongan pada kasus henti jantung", mataKuliah:"Kecelakaan Kerja dan PAK (Kurikulum 2020)", rasio:"1:10", jumlah:"1", tahun:"2025", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Pertolongan pertama kecelakaan kerja" },
+  { id:"KK-02", lab:"Kesehatan Kerja", nama:"AED (Automated External Defibrillator)", spesifikasi:"Defibrilator eksternal otomatis untuk menganalisis irama jantung.", kegunaan:"Mendemonstrasikan pertolongan pada kasus henti jantung", mataKuliah:"Praktikum Kesehatan Kerja (Kurikulum 2024)", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pertolongan pertama kecelakaan kerja" },
+  { id:"KK-03", lab:"Kesehatan Kerja", nama:"Ambu Bag", spesifikasi:"Alat pemompa oksigen: sungkup, selang, dan pompa.", kegunaan:"Mendemonstrasikan pertolongan pada kasus henti jantung", mataKuliah:"Praktikum Kesehatan Kerja (Kurikulum 2024)", rasio:"1:10", jumlah:"2", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Pertolongan pertama kecelakaan kerja" },
+  { id:"KK-04", lab:"Kesehatan Kerja", nama:"Bidai / Spalk Kit", spesifikasi:"Alat penyangga kaku/fleksibel untuk menstabilkan anggota tubuh cedera (fraktur, terkilir, dislokasi).", kegunaan:"Menjaga posisi anatomis, mengurangi nyeri, mencegah kerusakan lebih lanjut saat evakuasi", mataKuliah:"Praktikum Kesehatan Kerja (Kurikulum 2024)", rasio:"1:5", jumlah:"17", tahun:"2024/2025", kondisi:"Berfungsi Baik", catatan:"2 set pengadaan 2024, 15 set hibah BMN 2025", kompetensi:"Pertolongan pertama kecelakaan kerja" },
+  { id:"KK-05", lab:"Kesehatan Kerja", nama:"Tensimeter", spesifikasi:"Alat pengukur tekanan darah standar.", kegunaan:"Mengukur tekanan darah pekerja", mataKuliah:"Kesehatan Kerja", rasio:"1:10", jumlah:"2", tahun:"2021", kondisi:"Berfungsi Baik", catatan:"Barang hibah", kompetensi:"Pemeriksaan kesehatan pekerja" },
+  { id:"KK-06", lab:"Kesehatan Kerja", nama:"Oksigen Portable", spesifikasi:"Oksigen mini portable untuk pertolongan pertama pada sesak napas.", kegunaan:"Mendemonstrasikan pertolongan pada kasus henti napas", mataKuliah:"Kesehatan Kerja", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pertolongan pertama kecelakaan kerja" },
+  { id:"KK-07", lab:"Kesehatan Kerja", nama:"Audiometer", spesifikasi:"Skrining pendengaran standar diagnostik, air conduction dan bone conduction.", kegunaan:"Pemeriksaan gangguan pendengaran pada pekerja", mataKuliah:"Kesehatan Kerja", rasio:"1:10", jumlah:"2", tahun:"2023", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Pemeriksaan kesehatan pekerja" },
+  { id:"KK-08", lab:"Kesehatan Kerja", nama:"Spirometer", spesifikasi:"Skrining pernapasan digital dengan corong yang dapat diganti.", kegunaan:"Pemeriksaan gangguan fungsi paru pada pekerja", mataKuliah:"Kesehatan Kerja", rasio:"1:10", jumlah:"2", tahun:"2023", kondisi:"Berfungsi Baik", catatan:"Diajukan kalibrasi", kompetensi:"Pemeriksaan kesehatan pekerja" },
+  { id:"KK-09", lab:"Kesehatan Kerja", nama:"Personal Dust Sampler (PDS)", spesifikasi:"Mengukur konsentrasi debu, kecepatan hisap 1,7 L/menit melalui kertas filter.", kegunaan:"Mengukur konsentrasi debu yang masuk ke paru pekerja", mataKuliah:"Kesehatan Kerja", rasio:"1:10", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Pengukuran debu paru" },
+  { id:"KK-10", lab:"Kesehatan Kerja", nama:"Treadmill", spesifikasi:"Alat latihan kardio treadmill elektrik.", kegunaan:"Test kebugaran pekerja", mataKuliah:"Kesehatan Kerja", rasio:"1:40", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Kebugaran pekerja" },
+  { id:"KK-11", lab:"Kesehatan Kerja", nama:"Bangku Harvard Step Test", spesifikasi:"Alat uji kebugaran untuk menilai daya tahan jantung-paru (cardiorespiratory endurance).", kegunaan:"Test kebugaran pekerja", mataKuliah:"Kesehatan Kerja", rasio:"1:8", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Kebugaran pekerja" },
+  { id:"KK-12", lab:"Kesehatan Kerja", nama:"Lakasidaya / Reaction Timer (L77)", spesifikasi:"Alat uji kelelahan kerja / pengukur waktu reaksi secara digital.", kegunaan:"Mengukur waktu reaksi antara rangsang alat dan respons pekerja", mataKuliah:"Ergonomi (Kurikulum 2020)", rasio:"1:10", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Ergonomi – kelelahan kerja" },
+  { id:"KK-13", lab:"Kesehatan Kerja", nama:"Kursi Antropometri", spesifikasi:"Mengukur 34 dimensi tubuh manusia (posisi berdiri, duduk, wajah). Dimensi 200×2300×2400 mm, 220 V, 30 kg.", kegunaan:"Mengukur dimensi tubuh manusia untuk analisis ergonomi", mataKuliah:"Aplikasi Ergonomi (Kurikulum 2024)", rasio:"1:40", jumlah:"0", tahun:"–", kondisi:"Tidak Tersedia", catatan:"Belum ada pengadaan", kompetensi:"Ergonomi – antropometri" },
+
+  // ── Lab Keselamatan Kerja ─────────────────────────────────────
+  { id:"KJ-01", lab:"Keselamatan Kerja", nama:"Safety Helmet", spesifikasi:"Berstandar SNI, kait yang dapat diatur untuk lingkar kepala.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"14 (Merah:3, Hijau:4, Kuning:3, Putih:3, Emas:1)", tahun:"2024", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-02", lab:"Keselamatan Kerja", nama:"Safety Shoes", spesifikasi:"Berbahan kulit dengan plat besi di ujung, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"1", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-03", lab:"Keselamatan Kerja", nama:"Safety Gloves", spesifikasi:"Sarung tangan anti-slip, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"57 pasang (Karet:33, Rajut:24)", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-04", lab:"Keselamatan Kerja", nama:"Safety Goggles", spesifikasi:"Pelindung mata dari bahaya bahan kimia, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"2 Box", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-05", lab:"Keselamatan Kerja", nama:"Face Shield", spesifikasi:"Kaca khusus tidak mudah pecah, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"50 Buah", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-06", lab:"Keselamatan Kerja", nama:"Respirator", spesifikasi:"Pelindung saluran pernafasan dengan filter udara, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"4", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-07", lab:"Keselamatan Kerja", nama:"Ear Plug", spesifikasi:"Pelindung saluran pendengaran, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"20", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-08", lab:"Keselamatan Kerja", nama:"Ear Muff", spesifikasi:"Pelindung saluran pendengaran, berstandar SNI.", kegunaan:"Mendemonstrasikan APD di tempat kerja", mataKuliah:"Dasar K3", rasio:"1:40", jumlah:"4", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Alat Pelindung Diri (APD)" },
+  { id:"KJ-09", lab:"Keselamatan Kerja", nama:"Body Harness", spesifikasi:"Alat keselamatan bekerja di ketinggian, berstandar SNI.", kegunaan:"Mendemonstrasikan APD bekerja di ketinggian", mataKuliah:"K3 Lintas Sektor (Kurikulum 2024)", rasio:"1:40", jumlah:"1", tahun:"2022", kondisi:"Baik", catatan:"", kompetensi:"APD – bekerja di ketinggian" },
+  { id:"KJ-10", lab:"Keselamatan Kerja", nama:"Eye / Body Shower", spesifikasi:"Vertical Type. Tekanan 0,2–0,4 MPa. Flow shower >75,7 L/min (H:2,15m), eyewash 11,4 L/min (H:1m).", kegunaan:"Mendemonstrasikan penanganan tumpahan bahan kimia", mataKuliah:"Manajemen Pengelolaan & Pengolahan Limbah", rasio:"1:40", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Penanganan bahan berbahaya B3" },
+  { id:"KJ-11", lab:"Keselamatan Kerja", nama:"Spill Kit", spesifikasi:"50 Pads Absorbent @40×50 cm, 8 Socks @7,6×120 cm, 4 Cushions @20×25 cm, 5 Disposal Bag, 2 Pair Gloves, 2 Safety Goggles.", kegunaan:"Mendemonstrasikan penanganan tumpahan bahan kimia", mataKuliah:"Manajemen Pengolahan Limbah RS", rasio:"1:10", jumlah:"4", tahun:"–", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Penanganan bahan berbahaya B3" },
+
+  // ── Lab Fire ──────────────────────────────────────────────────
+  { id:"FI-01", lab:"Fire", nama:"Fire Cabinet Set", spesifikasi:"Terdiri dari: baju PMK, sarung tangan tahan panas, helm PMK, sepatu PMK Harvik, kapak Pulaski 60 cm, lampu senter PMK, SCBA, fire blanket 1,8×1,8 m, APAR 3 kg DCP, fireman suit 600°C, helm Safety NSA, rompi safety.", kegunaan:"Seperangkat APD dan alat penanggulangan kebakaran", mataKuliah:"Penanggulangan Krisis Kesehatan pada Bencana", rasio:"1:40", jumlah:"1 (hanya lemari)", tahun:"2024", kondisi:"Baik", catatan:"Isi fire cabinet belum lengkap", kompetensi:"Pemadaman kebakaran" },
+  { id:"FI-02", lab:"Fire", nama:"APAR CO₂", spesifikasi:"Bahan pemadam Karbon Dioksida (CO₂), berat 6 kg.", kegunaan:"Alat pemadam kebakaran", mataKuliah:"Penanggulangan Krisis Kesehatan pada Bencana", rasio:"1:5", jumlah:"1", tahun:"2024", kondisi:"Baik", catatan:"⚠️ Isi expired Maret 2026 – perlu pengisian ulang", kompetensi:"Pemadaman kebakaran" },
+  { id:"FI-03", lab:"Fire", nama:"APAR Dry Powder", spesifikasi:"Bahan pemadam bubuk kimia kering, berat 6 kg.", kegunaan:"Alat pemadam kebakaran", mataKuliah:"Penanggulangan Krisis Kesehatan pada Bencana", rasio:"1:5", jumlah:"3", tahun:"2021", kondisi:"Baik", catatan:"Isi ulang September 2025. Expired 17 Desember 2027.", kompetensi:"Pemadaman kebakaran" },
+  { id:"FI-04", lab:"Fire", nama:"APAR FOAM", spesifikasi:"Bahan pemadam busa AFFF (Aqueous Film Forming Foam), berat 6 kg.", kegunaan:"Alat pemadam kebakaran", mataKuliah:"Penanggulangan Krisis Kesehatan pada Bencana", rasio:"1:5", jumlah:"1", tahun:"2024", kondisi:"Baik", catatan:"⚠️ Isi expired Maret 2026 – perlu pengisian ulang", kompetensi:"Pemadaman kebakaran" },
+  { id:"FI-05", lab:"Fire", nama:"SCBA (Self Contained Breathing Apparatus)", spesifikasi:"Alat bantu pernapasan mandiri dengan tabung gas, untuk atmosfer berbahaya bagi kehidupan.", kegunaan:"Alat evakuasi kebakaran", mataKuliah:"Penanggulangan Krisis Kesehatan pada Bencana", rasio:"1:40", jumlah:"1", tahun:"2024", kondisi:"Berfungsi Baik", catatan:"", kompetensi:"Evakuasi kebakaran" },
+  { id:"FI-06", lab:"Fire", nama:"Fire Blanket", spesifikasi:"Kain khusus untuk memadamkan api kecil dan melindungi dari api/panas.", kegunaan:"Alat pemadam dan evakuasi kebakaran", mataKuliah:"Penanggulangan Krisis Kesehatan pada Bencana", rasio:"1:5", jumlah:"3", tahun:"2021", kondisi:"Baik", catatan:"", kompetensi:"Pemadaman kebakaran" },
+];
+
+const css = `
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#F0F4F8;color:#1F2937}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.tab-btn{transition:all .15s;cursor:pointer;white-space:nowrap}
+.tab-btn:hover{background:#1B3A6B!important}
+.tab-active{background:#0F2D5B!important;border-bottom:3px solid #E8821C!important}
+.row:hover{background:#F8FAFF!important}
+.edit-btn{transition:all .15s;cursor:pointer}
+.edit-btn:hover{background:#E8821C!important;color:#fff!important;border-color:#E8821C!important}
+.exp-btn{transition:all .15s;cursor:pointer}
+.exp-btn:hover{background:#F0F4F8!important}
+.save-btn{transition:background .15s;cursor:pointer}
+.save-btn:hover{background:#c26d16!important}
+.save-btn:disabled{opacity:.6;cursor:not-allowed}
+.cancel-btn:hover{background:#F3F4F6!important}
+input,select,textarea{font-family:inherit;font-size:14px;border:1.5px solid #E5E7EB;border-radius:8px;padding:9px 12px;width:100%;color:#1F2937;background:#FAFAFA;outline:none;transition:border .15s}
+input:focus,select:focus,textarea:focus{border-color:#0F2D5B;background:#fff}
+textarea{resize:vertical;min-height:72px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:#CBD5E0;border-radius:3px}
+`;
+
+function Badge({ kondisi }) {
+  const c = KONDISI[kondisi] || KONDISI["Tidak Tersedia"];
+  return (
+    <span style={{display:"inline-flex",alignItems:"center",gap:5,padding:"3px 10px",borderRadius:999,background:c.bg,color:c.tx,fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>
+      <span style={{width:6,height:6,borderRadius:"50%",background:c.dot,flexShrink:0}}/>
+      {kondisi}
+    </span>
+  );
+}
+
+export default function App() {
+  const [items, setItems]         = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [tab, setTab]             = useState("Higiene Industri");
+  const [search, setSearch]       = useState("");
+  const [kFilter, setKFilter]     = useState("Semua");
+  const [expanded, setExpanded]   = useState(null);
+  const [editItem, setEditItem]   = useState(null);
+  const [form, setForm]           = useState({});
+  const [editor, setEditor]       = useState("");
+  const [toast, setToast]         = useState(null);
+  const [meta, setMeta]           = useState({ ts: null, by: null });
+
+  useEffect(() => { load(); }, []);
+  useEffect(() => { const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+
+  async function load() {
+    try {
+      const r = await window.storage.get(STORAGE_KEY, true);
+      if (r?.value) {
+        const p = JSON.parse(r.value);
+        setItems(p.items); setMeta({ ts: p.ts, by: p.by });
+      } else { setItems(BASE); }
+    } catch { setItems(prev => prev || BASE); }
+    finally { setLoading(false); }
+  }
+
+  async function persist(newItems) {
+    const ts = new Date().toLocaleString("id-ID", { timeZone:"Asia/Jakarta", day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+    await window.storage.set(STORAGE_KEY, JSON.stringify({ items: newItems, ts, by: editor || "Anonim" }), true);
+    setItems(newItems); setMeta({ ts, by: editor || "Anonim" });
+  }
+
+  const filtered = useMemo(() => {
+    if (!items) return [];
+    return items.filter(i => {
+      if (i.lab !== tab) return false;
+      if (search) { const q = search.toLowerCase(); if (!i.nama.toLowerCase().includes(q) && !i.kegunaan.toLowerCase().includes(q) && !i.catatan.toLowerCase().includes(q)) return false; }
+      if (kFilter !== "Semua" && i.kondisi !== kFilter) return false;
+      return true;
+    });
+  }, [items, tab, search, kFilter]);
+
+  const stats = useMemo(() => {
+    if (!items) return {};
+    const s = {};
+    LABS.forEach(({ id }) => {
+      const arr = items.filter(i => i.lab === id);
+      s[id] = { total: arr.length, good: arr.filter(i => ["Berfungsi Baik","Baik"].includes(i.kondisi)).length, attn: arr.filter(i => ["Rusak Ringan","Rusak Berat","Diajukan Kalibrasi"].includes(i.kondisi)).length, unavail: arr.filter(i => i.kondisi === "Tidak Tersedia").length };
+    });
+    return s;
+  }, [items]);
+
+  function openEdit(item) {
+    setEditItem(item);
+    setForm({ jumlah: item.jumlah, tahun: item.tahun, kondisi: item.kondisi, catatan: item.catatan });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const newItems = items.map(i => i.id === editItem.id ? { ...i, ...form } : i);
+      await persist(newItems);
+      setEditItem(null);
+      notify("Data berhasil disimpan dan disinkronkan ke semua pengguna!", "ok");
+    } catch { notify("Gagal menyimpan. Silakan coba lagi.", "err"); }
+    setSaving(false);
+  }
+
+  function notify(msg, type) { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); }
+
+  const st = stats[tab] || {};
+
+  if (loading) return (
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"#F0F4F8",gap:16}}>
+      <div style={{width:52,height:52,border:"4px solid #E5E7EB",borderTopColor:"#E8821C",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+      <p style={{color:"#0F2D5B",fontWeight:700,fontSize:16}}>Memuat inventaris laboratorium K3…</p>
+    </div>
+  );
+
+  const rows = [];
+  filtered.forEach((item, idx) => {
+    const isExp = expanded === item.id;
+    const cfg = KONDISI[item.kondisi] || KONDISI["Tidak Tersedia"];
+    const zeroJumlah = item.jumlah === "0" || item.jumlah === 0;
+    rows.push(
+      <tr key={item.id} className="row" style={{borderBottom:"1px solid #F0F4F8",background:"#fff",transition:"background .1s"}}>
+        <td style={{padding:"11px 14px",color:"#9CA3AF",fontWeight:600,fontSize:12}}>{idx+1}</td>
+        <td style={{padding:"11px 14px"}}>
+          <div style={{fontWeight:700,color:"#0F2D5B",fontSize:13}}>{item.nama}</div>
+          <div style={{fontSize:11,color:"#9CA3AF",marginTop:2}}>{item.id}</div>
+        </td>
+        <td style={{padding:"11px 14px",maxWidth:220}}>
+          <div style={{fontSize:13,color:"#374151",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.kegunaan}</div>
+          {item.catatan && <div style={{fontSize:11,color:"#D97706",marginTop:3,fontStyle:"italic",lineHeight:1.4}}>{item.catatan}</div>}
+        </td>
+        <td style={{padding:"11px 14px",textAlign:"center",fontWeight:700,fontSize:13,color:"#374151",whiteSpace:"nowrap"}}>{item.rasio}</td>
+        <td style={{padding:"11px 14px",textAlign:"center"}}>
+          <span style={{fontWeight:800,fontSize:14,color: zeroJumlah ? "#EF4444" : "#0F2D5B"}}>{item.jumlah}</span>
+        </td>
+        <td style={{padding:"11px 14px",textAlign:"center",color:"#6B7280",fontSize:13}}>{item.tahun}</td>
+        <td style={{padding:"11px 14px"}}><Badge kondisi={item.kondisi}/></td>
+        <td style={{padding:"11px 14px",textAlign:"center"}}>
+          <div style={{display:"flex",gap:5,justifyContent:"center"}}>
+            <button className="exp-btn" onClick={()=>setExpanded(isExp ? null : item.id)}
+              style={{border:"1px solid #E5E7EB",borderRadius:6,padding:"4px 9px",background:"#fff",color:"#6B7280",fontSize:12,fontWeight:600}}>
+              {isExp ? "▲" : "▼"}
+            </button>
+            <button className="edit-btn" onClick={()=>openEdit(item)}
+              style={{border:"1.5px solid #E8821C",borderRadius:6,padding:"4px 10px",background:"#fff",color:"#E8821C",fontSize:12,fontWeight:700}}>
+              Edit
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+    if (isExp) rows.push(
+      <tr key={`${item.id}-d`}>
+        <td colSpan={8} style={{padding:"0 14px 14px",background:"#F8FAFF",borderBottom:"1px solid #F0F4F8"}}>
+          <div style={{background:"#fff",border:"1px solid #E8F0FE",borderRadius:8,padding:16,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,animation:"fadeIn .15s ease"}}>
+            <div>
+              <div style={{fontSize:11,color:"#9CA3AF",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Kompetensi</div>
+              <div style={{fontSize:13,color:"#374151"}}>{item.kompetensi}</div>
+            </div>
+            <div>
+              <div style={{fontSize:11,color:"#9CA3AF",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Mata Kuliah</div>
+              <div style={{fontSize:13,color:"#374151"}}>{item.mataKuliah}</div>
+            </div>
+            <div style={{gridColumn:"1/-1"}}>
+              <div style={{fontSize:11,color:"#9CA3AF",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>Spesifikasi Alat</div>
+              <div style={{fontSize:13,color:"#374151",lineHeight:1.7}}>{item.spesifikasi}</div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    );
+  });
+
+  return (
+    <div style={{minHeight:"100vh",background:"#F0F4F8"}}>
+      <style>{css}</style>
+
+      {/* ── HEADER ── */}
+      <div style={{background:"#0F2D5B",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:46,height:46,background:"#E8821C",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,color:"#fff",fontSize:17,flexShrink:0,letterSpacing:-.5}}>K3</div>
+          <div>
+            <div style={{color:"#E8821C",fontSize:10,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase"}}>Poltekkes Kemenkes Malang</div>
+            <div style={{color:"#fff",fontSize:16,fontWeight:800,lineHeight:1.2}}>Inventaris Laboratorium K3</div>
+            <div style={{color:"#93BFCF",fontSize:11,marginTop:1}}>Prodi Sarjana Terapan Keselamatan dan Kesehatan Kerja — Update 2026</div>
+          </div>
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,.1)",borderRadius:8,padding:"4px 10px",fontSize:11,color:"#6EE7B7",fontWeight:600,marginBottom:4}}>
+            🔄 Auto-sinkron setiap 30 detik
+          </div>
+          {meta.ts && <div style={{color:"#93BFCF",fontSize:11}}>Diperbarui: {meta.ts}{meta.by ? ` oleh ${meta.by}` : ""}</div>}
+        </div>
+      </div>
+
+      {/* ── TABS ── */}
+      <div style={{background:"#0F2D5B",padding:"0 20px",display:"flex",gap:2,overflowX:"auto"}}>
+        {LABS.map(({ id, icon }) => {
+          const s = stats[id] || {};
+          const isActive = tab === id;
+          return (
+            <button key={id} className={`tab-btn${isActive ? " tab-active" : ""}`} onClick={()=>setTab(id)}
+              style={{padding:"10px 16px",background:"transparent",border:"none",borderBottom:"3px solid transparent",color: isActive ? "#fff" : "#93BFCF",fontSize:12,fontWeight: isActive ? 700 : 500,display:"flex",alignItems:"center",gap:7,position:"relative"}}>
+              <span style={{fontSize:15}}>{icon}</span>
+              <span>{id}</span>
+              <span style={{background: isActive ? "#E8821C" : "rgba(255,255,255,.15)",color:"#fff",borderRadius:999,padding:"1px 7px",fontSize:10,fontWeight:700}}>{s.total||0}</span>
+              {(s.attn||0) > 0 && <span style={{background:"#EF4444",color:"#fff",borderRadius:999,padding:"1px 6px",fontSize:10,fontWeight:700}}>{s.attn}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{padding:"16px 20px 24px"}}>
+        {/* ── TOAST ── */}
+        {toast && (
+          <div style={{background: toast.type==="ok" ? "#065F46" : "#991B1B",color:"#fff",borderRadius:10,padding:"10px 16px",marginBottom:12,fontSize:13,fontWeight:600,animation:"fadeIn .2s ease"}}>
+            {toast.type==="ok" ? "✅" : "❌"} {toast.msg}
+          </div>
+        )}
+
+        {/* ── STAT BAR ── */}
+        <div style={{background:"#fff",borderRadius:12,padding:"14px 20px",marginBottom:12,display:"flex",gap:24,alignItems:"center",boxShadow:"0 1px 6px rgba(0,0,0,.06)",flexWrap:"wrap"}}>
+          {[
+            { label:"Total Jenis Alat", val: st.total||0, color:"#0F2D5B" },
+            { label:"Berfungsi / Baik", val: st.good||0, color:"#10B981" },
+            { label:"Perlu Perhatian", val: st.attn||0, color:"#F59E0B" },
+            { label:"Tidak Tersedia", val: st.unavail||0, color:"#9CA3AF" },
+          ].map((s,i) => (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:12}}>
+              {i > 0 && <div style={{width:1,height:32,background:"#E5E7EB"}}/>}
+              <div>
+                <div style={{fontSize:22,fontWeight:800,color:s.color,lineHeight:1}}>{s.val}</div>
+                <div style={{fontSize:11,color:"#9CA3AF",marginTop:2,fontWeight:500}}>{s.label}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+            <button onClick={load} style={{border:"1.5px solid #E5E7EB",borderRadius:8,padding:"7px 14px",background:"#fff",color:"#374151",fontSize:12,fontWeight:600,cursor:"pointer",transition:"all .15s"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#F3F4F6"} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* ── SEARCH + FILTER ── */}
+        <div style={{background:"#fff",borderRadius:12,padding:"12px 16px",marginBottom:12,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",boxShadow:"0 1px 6px rgba(0,0,0,.06)"}}>
+          <div style={{flex:1,minWidth:200,position:"relative"}}>
+            <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:15,color:"#9CA3AF",pointerEvents:"none"}}>🔍</span>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari nama alat, kegunaan, atau catatan…"
+              style={{paddingLeft:34,width:"100%"}}/>
+            {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#9CA3AF",fontSize:16,fontWeight:700,padding:2}}>×</button>}
+          </div>
+          <select value={kFilter} onChange={e=>setKFilter(e.target.value)} style={{width:"auto",minWidth:160}}>
+            <option value="Semua">Semua Kondisi</option>
+            {Object.keys(KONDISI).map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <div style={{fontSize:12,color:"#6B7280",fontWeight:600,whiteSpace:"nowrap",padding:"0 4px"}}>{filtered.length} alat</div>
+        </div>
+
+        {/* ── TABLE ── */}
+        <div style={{background:"#fff",borderRadius:12,overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,.06)"}}>
+          <div style={{background:"linear-gradient(to right, #0F2D5B, #1B3A6B)",padding:"14px 20px"}}>
+            <div style={{color:"#E8821C",fontSize:10,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase"}}>Laboratorium</div>
+            <div style={{color:"#fff",fontSize:16,fontWeight:800}}>Lab {tab}</div>
+          </div>
+
+          {tab === "Rekayasa Pengendalian Risiko" && filtered.length === 0 ? (
+            <div style={{padding:"60px 20px",textAlign:"center",color:"#9CA3AF"}}>
+              <div style={{fontSize:40,marginBottom:12}}>⚙️</div>
+              <div style={{fontWeight:700,fontSize:16,color:"#374151",marginBottom:8}}>Data inventaris belum tersedia</div>
+              <div style={{fontSize:13}}>Laboratorium Rekayasa Pengendalian Risiko sedang dalam pengembangan. Data alat akan ditambahkan segera.</div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{padding:"60px 20px",textAlign:"center",color:"#9CA3AF"}}>
+              <div style={{fontSize:36,marginBottom:8}}>📭</div>
+              <div style={{fontSize:13}}>Tidak ada alat yang sesuai kriteria pencarian.</div>
+            </div>
+          ) : (
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+                <thead>
+                  <tr style={{background:"#F8FAFF",borderBottom:"2px solid #E8F0FE"}}>
+                    {["No","Nama Alat","Kegunaan / Catatan","Rasio","Jumlah","Th. Pengadaan","Kondisi",""].map((h,i) => (
+                      <th key={i} style={{padding:"10px 14px",textAlign: [3,4,5,7].includes(i) ? "center" : "left",color:"#1B3A6B",fontWeight:700,fontSize:12,whiteSpace:"nowrap",letterSpacing:.3}}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>{rows}</tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div style={{textAlign:"center",marginTop:12,color:"#9CA3AF",fontSize:11}}>
+          Inventaris Lab K3 • Poltekkes Kemenkes Malang • Data tersinkron real-time
+        </div>
+      </div>
+
+      {/* ── EDIT MODAL ── */}
+      {editItem && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}
+          onClick={e=>{ if(e.target===e.currentTarget) setEditItem(null); }}>
+          <div style={{background:"#fff",borderRadius:16,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,.3)",animation:"fadeIn .2s ease",overflow:"hidden"}}>
+            <div style={{background:"linear-gradient(to right, #0F2D5B, #1B3A6B)",padding:"18px 22px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{color:"#E8821C",fontSize:10,fontWeight:700,letterSpacing:1.2,textTransform:"uppercase"}}>Edit Data — {editItem.id}</div>
+                <div style={{color:"#fff",fontSize:15,fontWeight:800,marginTop:3}}>{editItem.nama}</div>
+              </div>
+              <button onClick={()=>setEditItem(null)} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:8,width:32,height:32,color:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+            </div>
+            <div style={{padding:22,display:"flex",flexDirection:"column",gap:14}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Jumlah Unit</label>
+                  <input value={form.jumlah} onChange={e=>setForm(f=>({...f,jumlah:e.target.value}))} placeholder="Contoh: 2"/>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Tahun Pengadaan</label>
+                  <input value={form.tahun} onChange={e=>setForm(f=>({...f,tahun:e.target.value}))} placeholder="Contoh: 2024"/>
+                </div>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Kondisi Alat</label>
+                <select value={form.kondisi} onChange={e=>setForm(f=>({...f,kondisi:e.target.value}))}>
+                  {Object.keys(KONDISI).map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Catatan</label>
+                <textarea value={form.catatan} onChange={e=>setForm(f=>({...f,catatan:e.target.value}))} placeholder="Catatan kondisi, kalibrasi, perbaikan, expired, dll…"/>
+              </div>
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:"#374151",textTransform:"uppercase",letterSpacing:.6,marginBottom:5}}>Diperbarui oleh (opsional)</label>
+                <input value={editor} onChange={e=>setEditor(e.target.value)} placeholder="Nama dosen atau mahasiswa / NIM"/>
+                <div style={{fontSize:11,color:"#9CA3AF",marginTop:4}}>Dicatat sebagai log pembaruan terakhir untuk semua pengguna</div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:4}}>
+                <button className="cancel-btn" onClick={()=>setEditItem(null)}
+                  style={{flex:1,border:"1.5px solid #E5E7EB",borderRadius:10,padding:"11px",background:"#fff",color:"#6B7280",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                  Batal
+                </button>
+                <button className="save-btn" onClick={handleSave} disabled={saving}
+                  style={{flex:2,border:"none",borderRadius:10,padding:"11px",background:"#E8821C",color:"#fff",fontSize:14,fontWeight:800}}>
+                  {saving ? "⏳ Menyimpan…" : "💾 Simpan & Sinkron"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
